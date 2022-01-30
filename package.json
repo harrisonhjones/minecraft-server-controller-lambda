@@ -1,0 +1,23 @@
+{
+  "name": "minecraft-server-controller-lambda",
+  "version": "1.0.0",
+  "description": "Control an EC2 instance running a Minecraft server",
+  "main": "index.js",
+  "devDependencies": {
+    "aws-sdk": "^2.1066.0",
+    "minecraft-protocol": "^1.30.0",
+    "prettier": "^2.5.1",
+    "prettier-plugin-sort-json": "^0.0.2",
+    "request": "^2.87.0",
+    "webpack": "^5.67.0",
+    "webpack-cli": "^4.9.2"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules dist",
+    "format": "prettier --json-recursive-sort --write \"*.{js,json,md}\"",
+    "build": "webpack",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Harrison Jones (harrison@hhj.me)",
+  "license": "MIT"
+}
