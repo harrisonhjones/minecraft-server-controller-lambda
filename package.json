@@ -1,6 +1,6 @@
 {
   "name": "minecraft-server-controller-lambda",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Control an EC2 instance running a Minecraft server",
   "main": "index.js",
   "devDependencies": {

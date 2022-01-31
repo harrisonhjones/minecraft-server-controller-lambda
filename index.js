@@ -1,6 +1,12 @@
 const AWS = require("aws-sdk");
+const request = require("request");
+const mc = require("minecraft-protocol");
+
 const ec2 = new AWS.EC2({ region: "us-east-1" });
 const instanceId = process.env.INSTANCE_ID;
+const webhookUrl = process.env.WEBHOOK_URL;
+const dnsName = process.env.DNS_NAME;
+const duckDnsToken = process.env.DUCK_DNS_TOKEN;
 
 // The Lambda entry point.
 exports.handler = (event, context, callback) => {
@@ -63,8 +69,6 @@ exports.handler = (event, context, callback) => {
 };
 
 function sendMessage(message, cb) {
-  const request = require("request");
-  const webhookUrl = process.env.WEBHOOK_URL;
   if (!webhookUrl) {
     console.error("no webhook url set");
     return;
@@ -101,6 +105,10 @@ function getStatus(instanceId, cb) {
       instance: instanceData,
     };
 
+    if (dnsName) {
+      response.dnsName = `${dnsName}.duckdns.org`;
+    }
+
     if (instanceData.state != "running") return cb(null, response);
 
     getMinecraftServerStatus(instanceData.ip, function (err, serverData) {
@@ -127,8 +135,31 @@ function startInstance(instanceId, cb) {
         console.log(err, err.stack);
         return cb("failed to start instance");
       }
-      sendMessage("minecraft server starting");
-      return cb(null, { message: "instance starting" });
+
+      setTimeout(() => {
+        getInstanceStatus(instanceId, function (err, instanceData) {
+          if (err) return cb(err);
+
+          const ipAddress = instanceData.ip;
+          if (!ipAddress) {
+            sendMessage(
+              `minecraft server starting - ⚠️ failed to update 🦆 dns; ip address unavailable ⚠️`
+            );
+            return cb(null, { message: "instance starting" });
+          }
+
+          updateDuckDns(ipAddress, (err, updated) => {
+            if (err !== null || (!updated && dnsName)) {
+              sendMessage(
+                `minecraft server starting - ⚠️ failed to update 🦆 dns; ip is ${ipAddress} ⚠️`
+              );
+            } else {
+              sendMessage("minecraft server starting");
+            }
+            return cb(null, { message: "instance starting" });
+          });
+        });
+      }, 1000 * 5); // 5 seconds
     });
   });
 }
@@ -187,7 +218,6 @@ function getInstanceStatus(instanceId, cb) {
 
 // Gets the Minecraft server status.
 function getMinecraftServerStatus(ip, cb) {
-  const mc = require("minecraft-protocol");
   mc.ping(
     {
       host: ip,
@@ -199,6 +229,34 @@ function getMinecraftServerStatus(ip, cb) {
         return cb("failed to query status of minecraft server");
       }
       return cb(null, data);
+    }
+  );
+}
+
+// Updates the dns in duckdns.org.
+function updateDuckDns(ip, cb) {
+  if (!dnsName) {
+    console.warn("no dns name set; not updating dynamic dns via 🦆 dns");
+    return cb(null, false);
+  }
+  if (!duckDnsToken) {
+    console.warn("no 🦆 dns token set; not updating dynamic dns via 🦆 dns");
+    return cb(null, false);
+  }
+  console.log("setting dynamic dns via 🦆 dns; domain:", dnsName, "ip", ip);
+  request.get(
+    {
+      url: `https://www.duckdns.org/update?domains=${dnsName}&token=${duckDnsToken}&ip=${ip}`,
+    },
+    function (error, response, body) {
+      if (error !== null) {
+        console.warn("failed to update 🦆 dns");
+        console.warn("error:", error);
+        console.warn("statusCode:", response && response.statusCode);
+        console.warn("body:", body);
+        return cb(error);
+      }
+      cb(null, true);
     }
   );
 }
