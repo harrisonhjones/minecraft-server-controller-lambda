@@ -186,7 +186,17 @@ function stopInstance(instanceId, cb) {
           return cb("failed to stop instance");
         }
         sendMessage("minecraft server stopping");
-        return cb(null, { message: "instance stopping" });
+
+        updateDuckDns(false, (err, updated) => {
+          if (err !== null || (!updated && dnsName)) {
+            sendMessage(
+              `minecraft server stopping - ⚠️ failed to update 🦆 dns ⚠️`
+            );
+          } else {
+            sendMessage("minecraft server stopping");
+          }
+          return cb(null, { message: "instance stopping" });
+        });
       });
     });
   });
@@ -234,6 +244,8 @@ function getMinecraftServerStatus(ip, cb) {
 }
 
 // Updates the dns in duckdns.org.
+// If ip is truthy the domain will be updated.
+// If ip is falsey the domain will be cleared.
 function updateDuckDns(ip, cb) {
   if (!dnsName) {
     console.warn("no dns name set; not updating dynamic dns via 🦆 dns");
@@ -243,13 +255,22 @@ function updateDuckDns(ip, cb) {
     console.warn("no 🦆 dns token set; not updating dynamic dns via 🦆 dns");
     return cb(null, false);
   }
-  console.log("setting dynamic dns via 🦆 dns; domain:", dnsName, "ip", ip);
+
+  let url;
+  if (ip) {
+    console.log("setting dynamic dns via 🦆 dns; domain:", dnsName, "ip", ip);
+    url = `https://www.duckdns.org/update?domains=${dnsName}&token=${duckDnsToken}&ip=${ip}`;
+  } else {
+    console.log("clearing dynamic dns via 🦆 dns; domain:", dnsName);
+    url = `https://www.duckdns.org/update?domains=${dnsName}&token=${duckDnsToken}&clear=true`;
+  }
+
   request.get(
     {
-      url: `https://www.duckdns.org/update?domains=${dnsName}&token=${duckDnsToken}&ip=${ip}`,
+      url: url,
     },
     function (error, response, body) {
-      if (error !== null) {
+      if (error !== null || body !== "OK") {
         console.warn("failed to update 🦆 dns");
         console.warn("error:", error);
         console.warn("statusCode:", response && response.statusCode);
