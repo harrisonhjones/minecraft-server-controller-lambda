@@ -19,13 +19,13 @@ exports.handler = (event, context, callback) => {
     case "/start":
       return startInstance(instanceId, cb);
     case "/stop":
-      return stopInstance(instanceId, cb);
+      return stopInstance({ instanceId, source: "api" }, cb);
     case "/status":
       return getStatus(instanceId, cb);
     default:
       // The function is invoked every 15 minutes using a CloudWatch trigger with no event resource.
       // Since this is an automated call we want to log any errors instead of transforming them.
-      return stopInstance(instanceId, callback);
+      return stopInstance({ instanceId, source: "automation" }, callback);
   }
 
   // cb is a helper function that transforms errors to error messages, attaches helpful links, and also logs the response.
@@ -165,7 +165,7 @@ function startInstance(instanceId, cb) {
 }
 
 // Stops the EC2 instance if it is running and there are no players online in the Minecraft server running on the instance. Does not return an error if it is already stopped.
-function stopInstance(instanceId, cb) {
+function stopInstance({ instanceId, source }, cb) {
   getInstanceStatus(instanceId, function (err, instanceData) {
     if (err) return cb(err);
     if (instanceData.state == "stopped")
@@ -187,13 +187,12 @@ function stopInstance(instanceId, cb) {
         }
 
         updateDuckDns(false, (err, updated) => {
+          let messages = ["minecraft server stopping"];
+          messages.push(`[Source: ${source}]`);
           if (err !== null || (!updated && dnsName)) {
-            sendMessage(
-              `minecraft server stopping - ⚠️ failed to update 🦆 dns ⚠️`
-            );
-          } else {
-            sendMessage("minecraft server stopping");
+            messages.push("[⚠️ Warning: failed to update 🦆 dns]");
           }
+          sendMessage(messages.join(" "));
           return cb(null, { message: "instance stopping" });
         });
       });
