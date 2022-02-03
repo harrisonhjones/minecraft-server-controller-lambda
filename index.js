@@ -185,7 +185,6 @@ function stopInstance(instanceId, cb) {
           console.log(err, err.stack);
           return cb("failed to stop instance");
         }
-        sendMessage("minecraft server stopping");
 
         updateDuckDns(false, (err, updated) => {
           if (err !== null || (!updated && dnsName)) {
