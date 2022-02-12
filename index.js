@@ -7,6 +7,7 @@ const instanceId = process.env.INSTANCE_ID;
 const webhookUrl = process.env.WEBHOOK_URL;
 const dnsName = process.env.DNS_NAME;
 const duckDnsToken = process.env.DUCK_DNS_TOKEN;
+const sendMessageOnStart = process.env.SEND_MESSAGE_ON_START === "true";
 
 // The Lambda entry point.
 exports.handler = (event, context, callback) => {
@@ -136,6 +137,14 @@ function startInstance(instanceId, cb) {
         return cb("failed to start instance");
       }
 
+      if (!dnsName) {
+        console.log("no DNS name set; skipping updating dynamic DNS");
+        if (sendMessageOnStart) {
+          sendMessage(`minecraft server starting`);
+        }
+        return cb(null, { message: "instance starting" });
+      }
+
       setTimeout(() => {
         getInstanceStatus(instanceId, function (err, instanceData) {
           if (err) return cb(err);
@@ -184,6 +193,11 @@ function stopInstance({ instanceId, source }, cb) {
         if (err) {
           console.log(err, err.stack);
           return cb("failed to stop instance");
+        }
+
+        if (!dnsName) {
+          console.log("no DNS name set; skipping updating dynamic DNS");
+          return cb(null, { message: "instance stopping" });
         }
 
         updateDuckDns(false, (err, updated) => {
